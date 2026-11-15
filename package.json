@@ -1,0 +1,22 @@
+{
+  "name": "jijazyfx",
+  "version": "0.1.0",
+  "description": "JijazyFX — Telegram forex auto-trading bot for MetaTrader 5 accounts (Octa and other MT5 brokers) via MetaApi. Demo first; real money locked until a strategy passes an out-of-sample test.",
+  "main": "api/telegram-webhook.js",
+  "private": true,
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "lab": "node scripts/lab.js",
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@vercel/functions": "3.9.9",
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1"
+  }
+}

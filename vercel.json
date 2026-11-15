@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "regions": ["fra1"],
+  "functions": {
+    "api/**/*.js": {
+      "includeFiles": "data/**",
+      "maxDuration": 60
+    }
+  }
+}
