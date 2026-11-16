@@ -55,3 +55,14 @@ test('health lists missing settings', async () => {
   await health({ query: { key: 'k' }, headers: {} }, r);
   assert.ok(r.body.missing.includes('METAAPI_TOKEN'));
 });
+
+test('lab with wrong symbol names explains why there is no data', async () => {
+  process.env.FX_SYMBOLS = 'EURUSDX,GBPUSDX';
+  await accounts.connect('111', { login: '12345678', password: 'pw123456', server: 'OctaFX-Demo' });
+  await labJob.start('111');
+  const s = await labJob.step({ selfCall: false });
+  assert.strictEqual(s.finished, true);
+  const msg = sent.find(m => /Lab failed/.test(m.text || ''));
+  assert.match(msg.text, /EURUSDX: only 0 days/);
+  assert.match(msg.text, /FX_SYMBOLS/);
+});

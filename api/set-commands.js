@@ -26,8 +26,8 @@ module.exports = async (req, res) => {
       secret_token: process.env.TELEGRAM_WEBHOOK_SECRET || undefined,
       allowed_updates: ['message', 'callback_query'],
       drop_pending_updates: true,
-    });
-    const cmds = await tg.call('setMyCommands', { commands: COMMANDS.map(([command, description]) => ({ command, description })) });
+    }, 30000);
+    const cmds = await tg.call('setMyCommands', { commands: COMMANDS.map(([command, description]) => ({ command, description })) }, 30000);
     return res.status(200).json({ ok: true, webhook: `${base}/api/telegram-webhook`, setWebhook: hook, setMyCommands: cmds });
   } catch (err) {
     return res.status(500).json({ ok: false, error: err.message });

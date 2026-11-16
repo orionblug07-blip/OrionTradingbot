@@ -134,7 +134,11 @@ async function status(chatId) {
   const a = await get(chatId);
   if (!a) return null;
   const out = { ...a, state: null, connectionStatus: null, info: null };
-  try { const m = await mt.getAccount(a.metaId); out.state = m.state; out.connectionStatus = m.connectionStatus; } catch (err) { out.error = err.message; }
+  try {
+    const m = await mt.getAccount(a.metaId);
+    out.state = m.state; out.connectionStatus = m.connectionStatus;
+    if (m.state === 'UNDEPLOYED' || m.state === 'DEPLOY_FAILED') { await mt.deployAccount(a.metaId); out.deployRequested = true; }
+  } catch (err) { out.error = err.message; }
   if (out.connectionStatus === 'CONNECTED') {
     try { out.info = await mt.accountInfo(a.ref); } catch (err) { out.error = err.message; }
   }

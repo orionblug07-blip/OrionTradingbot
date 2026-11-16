@@ -59,7 +59,8 @@ function fakeMetaApi({ candles = {}, equity = 10000, currency = 'USD' } = {}) {
     let m = url.match(/provisioning.*\/accounts\/([^/]+)$/);
     if (m && method === 'GET') return f.accounts[m[1]] ? ok(f.accounts[m[1]]) : ok({ message: 'not found' }, 404);
     if (m && method === 'DELETE') { delete f.accounts[m[1]]; return ok(null, 204); }
-    if (/\/deploy$/.test(url)) return ok(null, 204);
+    m = url.match(/accounts\/([^/]+)\/deploy$/);
+    if (m) { f.deployCalls = (f.deployCalls || 0) + 1; const a = f.accounts[m[1]]; if (a) { a.state = 'DEPLOYED'; a.connectionStatus = 'CONNECTED'; } return ok(null, 204); }
     if (url.endsWith('/account-information')) return ok({ balance: f.equity, equity: f.equity, currency: f.currency, leverage: 500, freeMargin: f.equity, platform: 'mt5' });
     if (url.endsWith('/positions')) return ok(f.positions);
     m = url.match(/\/symbols\/([^/]+)\/current-price$/);

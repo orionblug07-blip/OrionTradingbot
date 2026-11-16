@@ -41,6 +41,18 @@ async function step({ now = Date.now, selfCall = true } = {}) {
   const t0 = now();
   try {
     const acct = await autoTrader.dataAccount();
+    const ready = await mt.ensureDeployed(acct, { waitMs: 25000 });
+    if (!ready.ready) {
+      j.waits = (j.waits || 0) + 1;
+      if (j.waits > 12) throw new Error(`the MetaApi account is still ${ready.state} / ${ready.connectionStatus}. Open app.metaapi.cloud/accounts and check it is deployed and connected`);
+      await store.setJSON(JOB, j);
+      if (j.waits === 1) {
+        const to = j.requestedBy || process.env.TELEGRAM_CHAT_ID;
+        if (to) await tg.send(to, `⏳ The MetaApi account is ${ready.state} / ${ready.connectionStatus}. I've asked MetaApi to start it and will continue the lab when it's connected.`, { plain: true });
+      }
+      if (selfCall) await kick();
+      return { finished: false, waiting: ready };
+    }
     const symbols = cfg.symbols();
     let have = 0;
     for (const s of symbols) {
@@ -48,7 +60,7 @@ async function step({ now = Date.now, selfCall = true } = {}) {
       if (now() - t0 > BUDGET_MS) break;
       const loaded = await lab.loadData(acct, [s], BARS, (m) => j.log.push(m));
       if (loaded[s]) await store.cmd('SET', DATA(s), pack(loaded[s]), 'EX', 24 * 3600);
-      else await store.cmd('SET', DATA(s), JSON.stringify({ skip: true }), 'EX', 24 * 3600);
+      else await store.cmd('SET', DATA(s), JSON.stringify({ skip: true }), 'EX', 3600);
       have++;
     }
     if (have < symbols.length) {
@@ -64,6 +76,16 @@ async function step({ now = Date.now, selfCall = true } = {}) {
       const o = JSON.parse(raw);
       if (!o.skip) data[s] = unpack(raw);
     }
+    if (!Object.keys(data).length) {
+      await store.setJSON(JOB, { ...j, status: 'failed', error: 'no price data' });
+      for (const sym of symbols) await store.cmd('DEL', DATA(sym));
+      const to = j.requestedBy || process.env.TELEGRAM_CHAT_ID;
+      if (to) await tg.send(to, `❌ Lab failed: no usable price data.
+${(j.log || []).slice(-12).join('\n') || 'No details.'}
+
+Check FX_SYMBOLS matches your broker's symbol names, then send lab run again.`, { plain: true });
+      return { finished: true, error: 'no price data', log: j.log };
+    }
     const result = lab.runLab(data);
     await lab.saveResult(result);
     await store.setJSON(JOB, { ...j, status: 'done', finishedAt: new Date().toISOString() });
@@ -72,8 +94,9 @@ async function step({ now = Date.now, selfCall = true } = {}) {
     return { finished: true, result };
   } catch (err) {
     await store.setJSON(JOB, { ...j, status: 'failed', error: err.message });
+    for (const sym of cfg.symbols()) await store.cmd('DEL', DATA(sym)).catch(() => {});
     const to = j.requestedBy || process.env.TELEGRAM_CHAT_ID;
-    if (to) await tg.send(to, `❌ Lab failed: ${err.message}`, { plain: true });
+    if (to) await tg.send(to, `❌ Lab failed: ${err.message}${j.log?.length ? '\n' + j.log.slice(-12).join('\n') : ''}`, { plain: true });
     return { finished: true, error: err.message };
   } finally {
     await store.cmd('DEL', 'fx:lock:lab').catch(() => {});

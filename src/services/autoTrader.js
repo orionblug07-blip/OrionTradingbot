@@ -333,6 +333,8 @@ async function runDaily({ force = false, now = Date.now(), notify = true } = {})
   try {
     const strategy = await lab.activeStrategy();
     const acct = await dataAccount();
+    const ready = await mt.ensureDeployed(acct, { waitMs: 15000 });
+    if (!ready.ready) return { skipped: `price account not connected yet (${ready.state} / ${ready.connectionStatus}); MetaApi was asked to start it` };
     const sig = await computeSignals(acct, strategy, now);
     const barTime = Math.max(0, ...Object.values(sig).filter(s => s.lastTime).map(s => s.lastTime));
     if (!barTime) return { skipped: 'no price data', errors: Object.fromEntries(Object.entries(sig).map(([k, v]) => [k, v.error])) };
@@ -352,6 +354,10 @@ async function runDaily({ force = false, now = Date.now(), notify = true } = {})
 
     const reports = await mapLimit(users, 3, async (u) => {
       try {
+        if (u.metaId !== acct.id) {
+          const r = await mt.ensureDeployed(u.ref, { waitMs: 10000 });
+          if (!r.ready) throw new Error(`your account isn't running in MetaApi yet (${r.state} / ${r.connectionStatus}); I've asked it to start and will try again next run`);
+        }
         const rep = await manageUser(u, sig, strategy, ctx);
         await accounts.setError(u.chatId, null);
         const msg = userMessage(rep, u);

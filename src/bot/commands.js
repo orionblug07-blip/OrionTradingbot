@@ -190,10 +190,12 @@ async function cmdStatus(chatId) {
     `*MT5 ${s.login}* · ${s.server} · ${s.live ? '💵 REAL' : '🧪 demo'}`,
     `MetaApi: ${s.state || '?'} / ${s.connectionStatus || '?'}`,
   ];
-  if (s.info) {
+  if (s.info && s.state === 'DEPLOYED') {
     lines.push(`Balance ${money(+s.info.balance, s.info.currency)} · Equity ${money(+s.info.equity, s.info.currency)}`);
     lines.push(`Free margin ${money(+s.info.freeMargin, s.info.currency)} · Leverage 1:${s.info.leverage}`);
     if (s.info.investorMode) lines.push('⚠️ Connected with the INVESTOR password — the bot can\'t trade. Disconnect and connect again with the main password.');
+  } else if (s.deployRequested || /UNDEPLOY/.test(s.state || '')) {
+    lines.push('Your account was stopped in MetaApi\'s cloud. I\'ve asked MetaApi to start it again — check `status` in a few minutes.');
   } else if (s.connectionStatus && s.connectionStatus !== 'CONNECTED') {
     lines.push('The account is still starting up in the cloud, or MetaApi can\'t reach the broker. Try again in a few minutes.');
   }

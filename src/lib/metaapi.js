@@ -31,9 +31,10 @@ class MetaApiError extends Error {
 }
 
 let http = (cfg) => axios(cfg); // replaced in tests
-function _setHttp(fn) { http = fn; domainCache = null; }
+function _setHttp(fn, { fast = false } = {}) { http = fn; domainCache = null; sleep = fast ? async () => {} : realSleep; }
 
-const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const realSleep = (ms) => new Promise(r => setTimeout(r, ms));
+let sleep = realSleep;
 const token = () => process.env.METAAPI_TOKEN || '';
 const isConfigured = () => !!token();
 
@@ -127,6 +128,27 @@ async function deleteAccount(id) {
   catch (err) { if (err.status !== 404) throw err; }
 }
 
+/**
+ * Make sure the account is running in MetaApi's cloud. Deploys an UNDEPLOYED
+ * account and waits (up to waitMs) until it is DEPLOYED and CONNECTED.
+ * @returns {{ready: boolean, state: string, connectionStatus: string}}
+ */
+async function ensureDeployed(acct, { waitMs = 20000, pollMs = 4000 } = {}) {
+  requireAcct(acct);
+  let a = await getAccount(acct.id);
+  if (a.state === 'UNDEPLOYED' || a.state === 'DEPLOY_FAILED') {
+    await deployAccount(acct.id);
+  }
+  const until = Date.now() + waitMs;
+  for (;;) {
+    if (a.state === 'DEPLOYED' && a.connectionStatus === 'CONNECTED') return { ready: true, state: a.state, connectionStatus: a.connectionStatus };
+    if (Date.now() >= until) return { ready: false, state: a.state, connectionStatus: a.connectionStatus };
+    await sleep(pollMs);
+    a = await getAccount(acct.id);
+    if (a.state === 'UNDEPLOYED') await deployAccount(acct.id); // it finished undeploying — start it again
+  }
+}
+
 // ─── Account state ───────────────────────────────────────────────────────────
 /** { platform, broker, currency, server, balance, equity, margin, freeMargin, leverage, marginLevel, tradeAllowed, investorMode, name, login } */
 async function accountInfo(acct) {
@@ -195,7 +217,7 @@ async function history(acct, symbol, timeframe = '1d', bars = 3000) {
 
 module.exports = {
   MetaApiError, isConfigured, newTransactionId,
-  createAccount, getAccount, deployAccount, deleteAccount,
+  createAccount, getAccount, deployAccount, deleteAccount, ensureDeployed,
   accountInfo, positions, price, specification, dealsByPosition, trade,
   candles, history,
   _setHttp,

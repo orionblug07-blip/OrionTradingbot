@@ -61,3 +61,20 @@ test('disconnect removes the account from MetaApi and the bot', async () => {
   assert.strictEqual(await accounts.get('42'), null);
   assert.deepStrictEqual(await accounts.allChatIds(), []);
 });
+
+test('a stopped (UNDEPLOYED) account is started again by status and before trading', async () => {
+  mt._setHttp(f.http, { fast: true });
+  await accounts.connect('42', { login: '87654321', password: 'S3cret!', server: 'OctaFX-Demo' });
+  const a = await accounts.get('42');
+  Object.assign(f.accounts[a.metaId], { state: 'UNDEPLOYED', connectionStatus: 'DISCONNECTED' });
+  const s = await accounts.status('42');
+  assert.strictEqual(s.deployRequested, true);
+  assert.strictEqual(f.accounts[a.metaId].state, 'DEPLOYED');
+  Object.assign(f.accounts[a.metaId], { state: 'UNDEPLOYED', connectionStatus: 'DISCONNECTED' });
+  const r = await mt.ensureDeployed(a.ref, { waitMs: 1000, pollMs: 1 });
+  assert.strictEqual(r.ready, true);
+  Object.assign(f.accounts[a.metaId], { state: 'UNDEPLOYING', connectionStatus: 'CONNECTED' });
+  const r2 = await mt.ensureDeployed(a.ref, { waitMs: 0, pollMs: 1 });
+  assert.strictEqual(r2.ready, false);
+  assert.strictEqual(r2.state, 'UNDEPLOYING');
+});
